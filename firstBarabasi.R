@@ -76,7 +76,8 @@ make_microbe_series <- function(n, base = rgamma(1, 5), base_weight = 1,
 }
 
 set.seed(seed)
-everyonesNeighbor <- make_microbe_series(100, 5, base_weight = 1 , ac_weight = 2, season_weight = 0.01) %>% plot(type = "l")
+everyonesNeighbor <- make_microbe_series(100, 5, base_weight = 1 , ac_weight = 2, season_weight = 0.01) 
+everyonesNeighbor%>% plot(type = "l")
 
 # additional challenges: unevenly spaced vectors
 
@@ -87,7 +88,7 @@ paramSpace <- expand_grid(
   ac_weight = c(0, 1, 10, 100),
   neighbor_weight = c(0, 1, 10, 100),
   season_weight = c(0, 0.001, 0.01, 0.1, 1),
-  sd = c(0, 1, 2, 5, 10),
+  sd = c(0, 0.001, 0.1, 1, 5, 10),
   rep = 1:10
 )
 
@@ -110,8 +111,17 @@ paramSeries <- paramSeries %>% unnest(cols = c(series))
 
 paramSeries %>% filter(base %in% c(0, 1, 5),neighbor_weight == 0, season_weight == 0, sd == 1, rep <=5) %>%
   ggplot(aes(x = n, y = series, group = rep)) + geom_path() +
-  facet_grid(base ~ac_weight )
+  facet_grid(base ~ac_weight , scales = "free")
 
 paramSeries %>% filter(base %in% c(5), neighbor_weight == 0, sd == 1, rep <=5) %>%
   ggplot(aes(x = n, y = series, group = rep)) + geom_path() +
   facet_grid(ac_weight ~season_weight )
+
+wnp <- paramSeries %>% filter(base %in% c(5), season_weight == 0.1, sd == .1, rep <=5) %>%
+  ggplot(aes(x = n, y = series, group = rep)) + geom_path() +
+  facet_grid(ac_weight~neighbor_weight, scales = "free") 
+
+enp <- tibble(n = 1:100, series = everyonesNeighbor) %>% ggplot(aes(x = n, y = series)) + geom_path() + theme(plot.margin = unit(c(2, 0, 2, 0), "in"))
+
+cowplot::plot_grid(enp, wnp, rel_widths = c(1,2))
+
