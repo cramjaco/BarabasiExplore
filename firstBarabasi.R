@@ -78,7 +78,7 @@ make_microbe_series <- function(n, base = rgamma(1, 5), base_weight = 1,
 ## Second version
 
 make_microbe_proto_series <- function(n,
-                                ac_weight = 100,
+                                ac_weight = .1,
                                 neighbor_vec = NULL, lag = 0, neighbor_weight = 0,
                                 season_lag = runif(1, 0, 11), season_weight = 0,
                                 trend_weight = 0,
@@ -113,22 +113,73 @@ make_microbe_proto_series <- function(n,
         rnorm(1, 0, sd)
   }
   #mts[mts < 0] <- 0
-  mts
+  tibble(step = 1:n, mts = mts)
+}
+
+protoseries_to_counts <- function(protoSeries, base = rgamma(1, shape = 1)){
+  mts <- protoSeries$mts
+  
+  mts_rebase <- mts + base
+  mts_exp <- exp(mts_rebase)
+  
+  ct = map_int(mts_exp, ~rpois(n = 1, lambda = .))
+  
+  tibble(step = protoSeries$step, ct = ct)
+  
 }
 
 # I'm tempted to run this to make the pseudo network file. Then do some post processing where I add on a "base" value, exp() tranform everthing and then pull an rpois of that.
 # The rpois being the random draw from the underlyind distribution.
 
 # Step 1 -- Make Network
+library(igraph)
+seed(33100)
 
-bag_02
+NNodes <- 20
+theNetwork <- sample_pa(n = NNodes, algorithm = "psumtree-multiple")
+
+theNetwork_df <- igraph::as_data_frame(bag) %>% rename(to = "from", from = "to") %>% select(from, to) %>%
+  mutate(lag = rbinom(length(from), 1, 0))
+
+theNetwork01 <-graph_from_data_frame(bag_df) 
+
+plot(theNetwork01)
 
 
 # Step 2, generate pseudo series for each node
 
+pseudo_df <- tibble(node = 1:NNodes, series = vector(mode = "list", length = NNodes))
+
+loc_network_df <- theNetwork_df
+
+pseudo_df <- tibble(node = 1:NNodes, series = vector(mode = "list", length = NNodes))
+count_df <- tibble(node = 1:NNodes, series = vector(mode = "list", length = NNodes))
+for(nodeNum in 1:NNodes){
+  neighborData <- NULL
+  # Is node in the network table's "to" column?
+  if(nodeNum %in% loc_network_df$to){
+    # if so, save the neigbor's value to neighbor
+    neighborNode <- loc_network_df$from[which(loc_network_df$to == nodeNum)]
+    neighborData = loc_network_df[["series"]][[neighborNode]]
+  }
+  loc_protoseries <- make_microbe_proto_series(100,
+                            ac_weight = rbeta(1, 1.5, 1.5) * .4 - .4/2,
+                            season_weight = rbeta(1, 1.5, 1.5) * .4 - .4/2,
+                            trend_weight = rbeta(1, 1.5, 1.5) * .2 - .2/2, sd = 1,
+                            neighbor_vec = neighborData, neighbor_weight = 0.5) 
+  loc_count <- protoseries_to_counts(loc_protoseries, base = rgamma(1, shape = 1))
+  
+  pseudo_df[["series"]][[nodeNum]] <- loc_protoseries
+  count_df[["series"]][[nodeNum]] <- loc_count
+}
+
 ## 2b cat to data frame
 
 # Step 3, 
+
+count_df_2 <- unnest(count_df)
+
+count_df_wide <- pivot_wider(count_df_2, names_from = "step", values_from = "ct")
 
 
 
@@ -136,7 +187,7 @@ bag_02
 
 
 set.seed(seed)
-everyonesNeighbor <- make_microbe_proto_series(100, ac_weight = .6, season_weight = .2, trend_weight = 0.5) 
+everyonesNeighbor <- make_microbe_proto_series(100, ac_weight = .6, season_weight = .2, trend_weight = .1, sd = 1) 
 everyonesNeighbor%>% plot(type = "l")
 
 # additional challenges: unevenly spaced vectors
