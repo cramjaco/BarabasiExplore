@@ -75,8 +75,68 @@ make_microbe_series <- function(n, base = rgamma(1, 5), base_weight = 1,
   mts
 }
 
+## Second version
+
+make_microbe_proto_series <- function(n,
+                                ac_weight = 100,
+                                neighbor_vec = NULL, lag = 0, neighbor_weight = 0,
+                                season_lag = runif(1, 0, 11), season_weight = 0,
+                                trend_weight = 0,
+                                sd = 0.1){
+  mts = rep(NA, length.out = n)
+  if(is.null(neighbor_vec)){
+    neighbor_vec = rep(0, n)
+    neighbor_weight = 0
+  }
+  
+  season_vec = sin((season_lag + 0:n-1) * 2 * pi / 12)
+  trend_vec = seq(from = -1, to = 1, length.out = n)
+  
+  if(!(lag %in% c(0,1))){stop("lag must be 0 or 1")}
+  ## first element only
+  mts[1] = (
+    0 +
+      season_vec[1] * season_weight +
+      trend_vec[1] * trend_weight +
+      neighbor_vec[1] * neighbor_weight +
+      rnorm(1, 0, sd)
+)
+  
+  ## second through last element
+  for(iter in 2:n){
+    mts[iter] =
+      0 +
+      season_vec[iter] * season_weight + 
+      trend_vec[iter] * trend_weight +
+      neighbor_vec[iter] * neighbor_weight +
+        mts[iter - 1] * ac_weight +
+        rnorm(1, 0, sd)
+  }
+  #mts[mts < 0] <- 0
+  mts
+}
+
+# I'm tempted to run this to make the pseudo network file. Then do some post processing where I add on a "base" value, exp() tranform everthing and then pull an rpois of that.
+# The rpois being the random draw from the underlyind distribution.
+
+# Step 1 -- Make Network
+
+bag_02
+
+
+# Step 2, generate pseudo series for each node
+
+## 2b cat to data frame
+
+# Step 3, 
+
+
+
+### Graveyard/Scratch
+
+
 set.seed(seed)
-everyonesNeighbor <- make_microbe_series(100, 5, base_weight = 1 , ac_weight = 2, season_weight = 0.01) 
+everyonesNeighbor <- make_microbe_proto_series(100, ac_weight = .6, season_weight = .2, trend_weight = 0.5) 
 everyonesNeighbor%>% plot(type = "l")
 
 # additional challenges: unevenly spaced vectors
